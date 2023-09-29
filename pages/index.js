@@ -3,7 +3,7 @@ import { useEffect, useState, useRef } from "react";
 import styles from "../styles/Snake.module.css";
 
 const Config = {
-  height: 25,
+  height: 22,
   width: 25,
   cellSize: 32,
 };
@@ -74,40 +74,79 @@ const Snake = () => {
   // snake[0] is head and snake[snake.length - 1] is tail
   const [snake, setSnake] = useState(getDefaultSnake());
   const [direction, setDirection] = useState(Direction.Right);
-
   const [food, setFood] = useState({ x: 4, y: 10 });
   const [score, setScore] = useState(0);
 
   // move the snake
   useEffect(() => {
+    // ekhane vai food include kora hoise
+    const generateNewFood = () => {
+      let newFood;
+      do {
+        newFood = getRandomCell();
+      } while (isSnake(newFood));
+      setFood(newFood);
+    };
+    const foodGeneratorTimer = setInterval(generateNewFood, 3000);
+
+    // ekhane vai check korci head er sathe r kono snake array er position same hoy kina r boundary checking korsi
     const runSingleStep = () => {
       setSnake((snake) => {
         const head = snake[0];
         const newHead = { x: head.x + direction.x, y: head.y + direction.y };
+        for (let i = 1; i < snake.length; i++) {
+          if (snake[i].x === newHead.x && snake[i].y === newHead.y) {
+            setScore(0);
+            return getDefaultSnake();
+          }
+        }
 
-        // make a new snake by extending head
-        // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/Spread_syntax
+        //ekhane ulta direction diye sap ber korsi vai ....
+        if (
+          newHead.x < 0 ||
+          newHead.x >= Config.width ||
+          newHead.y < 0 ||
+          newHead.y >= Config.height
+        ) {
+          if (newHead.x < 0) newHead.x = Config.width - 1;
+          else if (newHead.x >= Config.width) newHead.x = 0;
+          else if (newHead.y < 0) newHead.y = Config.height - 1;
+          else if (newHead.y >= Config.height) newHead.y = 0;
+        }
+
+        // ekhane vai score baraisi & food add korsi each time food khaoar por
+        const isHeadOnFood = isFood(newHead);
         const newSnake = [newHead, ...snake];
-
-        // remove tail
-        newSnake.pop();
-
+        if (isHeadOnFood) {
+          generateNewFood();
+          setScore((score) => score + 0.5);
+        } else {
+          newSnake.pop();
+        }
         return newSnake;
       });
     };
-
-    runSingleStep();
-    const timer = setInterval(runSingleStep, 500);
-
-    return () => clearInterval(timer);
-  }, [direction, food]);
+    const gameTimer = setInterval(runSingleStep, 200);
+    const foodRemovalTimer = setInterval(() => setFood(null), 10000);
+    return () => {
+      clearInterval(foodGeneratorTimer);
+      clearInterval(gameTimer);
+      clearInterval(foodRemovalTimer);
+    };
+  }, [direction]);
 
   // update score whenever head touches a food
   useEffect(() => {
     const head = snake[0];
     if (isFood(head)) {
-      setScore((score) => {
-        return score + 1;
+      // setScore((score) => {
+      //   return score + 1;
+      // });
+      setSnake((snake) => {
+        const newSnake = [...snake];
+        const newTail = { ...newSnake[newSnake.length - 1] };
+        newSnake.push(newTail);
+        return newSnake;
       });
 
       let newFood = getRandomCell();
@@ -121,28 +160,41 @@ const Snake = () => {
 
   useEffect(() => {
     const handleNavigation = (event) => {
+      let dx = 0;
+      let dy = 0;
+
       switch (event.key) {
         case "ArrowUp":
-          setDirection(Direction.Top);
+          dy = -1;
           break;
 
         case "ArrowDown":
-          setDirection(Direction.Bottom);
+          dy = 1;
           break;
 
         case "ArrowLeft":
-          setDirection(Direction.Left);
+          dx = -1;
           break;
 
         case "ArrowRight":
-          setDirection(Direction.Right);
+          dx = 1;
           break;
+
+        default:
+          return;
+      }
+
+      if (dx !== 0 && direction.x !== -dx) {
+        setDirection({ x: dx, y: 0 });
+      } else if (dy !== 0 && direction.y !== -dy) {
+        setDirection({ x: 0, y: dy });
       }
     };
+
     window.addEventListener("keydown", handleNavigation);
 
     return () => window.removeEventListener("keydown", handleNavigation);
-  }, []);
+  }, [direction]);
 
   // ?. is called optional chaining
   // see: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Operators/Optional_chaining
